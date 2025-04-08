@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de Dados Financeiros</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <style>
+        .dropdown-menu li {
+            padding: 2px 5px;
+        }
+        .dropdown-menu .form-check {
+            padding: 5px 15px;
+        }
+        .dropdown-menu .form-check-input {
+            margin-right: 8px;
+            margin-left: -15px;
+        }
+        .dropdown-toggle::after {
+            float: right;
+            margin-top: 8px;
+        }
+        .dropdown-menu {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .theme-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .container {
+            max-width: none !important;
+            overflow-x: visible !important;
+        }
+
+        .card {
+            overflow: visible !important;
+        }
+        .card-header .nav-link {
+            cursor: pointer;
+        }
+        .no-print {
+            display: block;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .container {
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+        
+        .table-container {
+            width: 100%;
+            display: inline-block;
+            min-width: 100%;
+        }
+
+        .table {
+            width: auto;
+            min-width: 100%;
+        }
+
+        .table td:not(:first-child) {
+            white-space: nowrap;
+            padding-left: 12px;
+            padding-right: 12px;
+        }
+
+        .table td:first-child {
+            white-space: nowrap;
+            min-width: 150px;
+        }
+        
+        .dropdown-menu li .form-check-label {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 250px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="mb-4 text-center">Analisador de Dados Financeiros</h1>
+        
+        <div class="card mb-4">
+            <div class="card-body text-center">
+                <h5 class="card-title">Enviar arquivo Excel ou CSV</h5>
+                <div class="mb-3">
+                    <input class="form-control" type="file" id="fileInput" accept=".csv,.xlsx,.xls">
+                </div>
+                <div class="filter-container">
+                    <div class="row g-3 justify-content-center">
+                        <div class="col-md-5">
+                            <label class="form-label">Filtrar por Empresa:</label>
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" 
+                                        id="empFilterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                    Todas as empresas
+                                </button>
+                                <ul class="dropdown-menu" aria-labelledby="empFilterDropdown">
+                                    <li>
+                                        <div class="form-check ms-2">
+                                            <input class="form-check-input" type="checkbox" value="Todos" id="checkTodos" checked>
+                                            <label class="form-check-label" for="checkTodos">
+                                                Todas as empresas
+                                            </label>
+                                        </div>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <div id="empFilterItems"></div>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button id="uploadBtn" class="btn btn-primary w-100">Processar</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="errorMsg" class="alert alert-danger mt-3" style="display: none;"></div>
+                <div id="loadingMsg" class="alert alert-info mt-3" style="display: none;">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Processando arquivo, aguarde...
+                </div>
+            </div>
+        </div>
+        
+        <!-- Containers das tabelas -->
+        <div class="row">
+            <!-- Resumo Mensal -->
+            <div class="col-md-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Resumo por Mês</h5>
+                        <small class="filter-info text-muted">Empresas: Todas as empresas</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table id="monthTable" class="table table-striped table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>Jan</th>
+                                        <th>Fev</th>
+                                        <th>Mar</th>
+                                        <th>Abr</th>
+                                        <th>Mai</th>
+                                        <th>Jun</th>
+                                        <th>Jul</th>
+                                        <th>Ago</th>
+                                        <th>Set</th>
+                                        <th>Out</th>
+                                        <th>Nov</th>
+                                        <th>Dez</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Resumo por Fonte -->
+            <div class="col-md-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Resumo por Fonte</h5>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="filter-info text-muted">Empresas: Todas as empresas</small>
+                            <div class="form-group mb-0">
+                                <select id="monthSelect" class="form-select form-select-sm">
+                                    <option value="Todos">Todos os meses</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table id="sourceTable" class="table table-striped table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Fonte</th>
+                                        <!-- Cabeçalhos de tipo serão adicionados dinamicamente -->
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Rubricas -->
+            <div class="col-md-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Rubricas</h5>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="filter-info text-muted">Empresas: Todas as empresas</small>
+                            <div class="form-group mb-0">
+                                <select id="rubricasMonthSelect" class="form-select form-select-sm">
+                                    <option value="Todos">Todos os meses</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body" id="rubricasContainer">
+                        <!-- Os acordeões de rubricas serão adicionados aqui dinamicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button id="themeToggle" class="btn btn-secondary theme-toggle no-print" title="Alternar tema">
+        <i class="bi bi-moon-fill"></i>
+    </button>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Variáveis globais
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const errorMsg = document.getElementById('errorMsg');
+        const loadingMsg = document.getElementById('loadingMsg');
+        const monthSelect = document.getElementById('monthSelect');
+        const rubricasMonthSelect = document.getElementById('rubricasMonthSelect');
+        const themeToggle = document.getElementById('themeToggle');
+        const htmlElement = document.documentElement;
+        
+        const monthNames = {
+            '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
+            '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
+            '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
+        };
+        
+        // Mapeamento de códigos para nomes de empresas
+        const empresaNomes = {
+            '1': 'PCRJ',
+            '2': 'FUNPREVI',
+            '3': 'PREVI_RIO',
+            '4': 'PENSAO',
+            '5': 'GEO_RIO',
+            '6': 'IPP',
+            '7': 'PLANETARIO',
+            '8': 'FPJ',
+            '10': 'CIDADE_ARTES',
+            '11': 'RIO_AGUAS',
+            '12': 'GM_RIO',
+            '13': 'CET_RIO',
+            '16': 'MULTIRIO',
+            '17': 'RIOURBE',
+            '18': 'IPLANRIO',
+            '20': 'RIOFILME',
+            '21': 'RIOLUZ',
+            '23': 'RIOSAUDE'
+        };
+
+        let appData = {
+            monthSummary: {},
+            sourceSummary: {},
+            rubricasSummary: {},
+            months: [],
+            sources: [],
+            tipos: [],
+            empCodigos: []
+        };
+
+        // Variável para armazenar as empresas selecionadas
+        let selectedEmpresas = [];
+
+        // Função para atualizar o texto do botão dropdown
+        function updateDropdownButtonText() {
+            const dropdownBtn = document.getElementById('empFilterDropdown');
+            const checkTodos = document.getElementById('checkTodos');
+            
+            if (checkTodos.checked || selectedEmpresas.length === 0) {
+                dropdownBtn.textContent = 'Todas as empresas';
+                selectedEmpresas = [];
+            } else if (selectedEmpresas.length <= 3) {
+                // Mostra os nomes completos quando poucas empresas estão selecionadas
+                const nomesSelecionados = selectedEmpresas.map(codigo => {
+                    return `${codigo} - ${empresaNomes[codigo] || codigo}`;
+                });
+                dropdownBtn.textContent = nomesSelecionados.join(', ');
+            } else {
+                dropdownBtn.textContent = `${selectedEmpresas.length} empresa(s) selecionada(s)`;
+            }
+        }
+
+        // Função para popular o filtro de empresas
+        function populateEmpFilter(empCodigos) {
+            const container = document.getElementById('empFilterItems');
+            container.innerHTML = '';
+            
+            // Ordena os códigos numericamente
+            empCodigos.sort((a, b) => parseInt(a) - parseInt(b));
+            
+            empCodigos.forEach(codigo => {
+                const nomeEmpresa = empresaNomes[codigo] || codigo;
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div class="form-check">
+                        <input class="form-check-input emp-checkbox" type="checkbox" value="${codigo}" id="emp_${codigo}">
+                        <label class="form-check-label" for="emp_${codigo}">
+                            ${codigo} - ${nomeEmpresa}
+                        </label>
+                    </div>
+                `;
+                container.appendChild(li);
+            });
+            
+            // Adiciona event listeners aos checkboxes
+            document.querySelectorAll('.emp-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        document.getElementById('checkTodos').checked = false;
+                        selectedEmpresas.push(this.value);
+                    } else {
+                        selectedEmpresas = selectedEmpresas.filter(emp => emp !== this.value);
+                    }
+                    updateDropdownButtonText();
+                });
+            });
+            
+            // Event listener para o checkbox "Todos"
+            document.getElementById('checkTodos').addEventListener('change', function() {
+                if (this.checked) {
+                    document.querySelectorAll('.emp-checkbox').forEach(cb => {
+                        cb.checked = false;
+                    });
+                    selectedEmpresas = [];
+                }
+                updateDropdownButtonText();
+            });
+            
+            updateDropdownButtonText();
+        }
+
+        // Função para formatar valores monetários
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(value || 0);
+        }
+        
+        // Função para ajustar dinamicamente as tabelas
+        function adjustTables() {
+            document.querySelectorAll('.table-container').forEach(container => {
+                const table = container.querySelector('.table');
+                const tableWidth = Array.from(table.rows[0].cells).reduce(
+                    (total, cell) => total + cell.offsetWidth, 0
+                );
+                container.style.width = `${tableWidth}px`;
+            });
+        }
+
+        // Executa ao carregar e quando os dados são atualizados
+        window.addEventListener('load', adjustTables);
+
+        // Função para atualizar os filtros aplicados
+        function updateFilterTitle() {
+            const checkTodos = document.getElementById('checkTodos');
+            let filterValue;
+            
+            if (checkTodos.checked || selectedEmpresas.length === 0) {
+                filterValue = 'Todas as empresas';
+            } else if (selectedEmpresas.length <= 5) {
+                // Mostra até 5 empresas com seus nomes
+                filterValue = selectedEmpresas.map(codigo => {
+                    return `${codigo} - ${empresaNomes[codigo] || codigo}`;
+                }).join(', ');
+            } else {
+                filterValue = `${selectedEmpresas.length} empresas selecionadas`;
+            }
+            
+            // Atualiza os textos dos filtros em todas as tabelas
+            document.querySelectorAll('.filter-info').forEach(el => {
+                el.textContent = `Empresas: ${filterValue}`;
+            });
+        }
+
+        // Função para popular a tabela mensal
+        function populateMonthTable() {
+            const tableBody = document.querySelector('#monthTable tbody');
+            tableBody.innerHTML = '';
+            
+            // Atualiza filtros
+            updateFilterTitle();
+            
+            if (!appData.monthSummary || Object.keys(appData.monthSummary).length === 0) {
+                return;
+            }
+            
+            const months = Array.from({length: 12}, (_, i) => String(i + 1).padStart(2, '0'));
+            
+            for (const tipo in appData.monthSummary) {
+                const row = document.createElement('tr');
+                let totalRow = 0;
+                
+                // Coluna de tipo
+                const tipoCell = document.createElement('td');
+                tipoCell.textContent = tipo;
+                row.appendChild(tipoCell);
+                
+                // Colunas de meses
+                months.forEach(month => {
+                    const value = appData.monthSummary[tipo][month] || 0;
+                    totalRow += parseFloat(value);
+                    
+                    const cell = document.createElement('td');
+                    cell.textContent = formatCurrency(value);
+                    row.appendChild(cell);
+                });
+                
+                // Coluna total
+                const totalCell = document.createElement('td');
+                totalCell.textContent = formatCurrency(totalRow);
+                totalCell.style.fontWeight = 'bold';
+                row.appendChild(totalCell);
+                
+                tableBody.appendChild(row);
+            }
+            
+            // Linha de total
+            const totalRow = document.createElement('tr');
+            totalRow.classList.add('table-active');
+            
+            const totalLabelCell = document.createElement('td');
+            totalLabelCell.textContent = 'TOTAL';
+            totalLabelCell.style.fontWeight = 'bold';
+            totalRow.appendChild(totalLabelCell);
+            
+            let grandTotal = 0;
+            
+            months.forEach(month => {
+                let monthTotal = 0;
+                for (const tipo in appData.monthSummary) {
+                    monthTotal += parseFloat(appData.monthSummary[tipo][month] || 0);
+                }
+                
+                grandTotal += monthTotal;
+                
+                const cell = document.createElement('td');
+                cell.textContent = formatCurrency(monthTotal);
+                cell.style.fontWeight = 'bold';
+                totalRow.appendChild(cell);
+            });
+            
+            const grandTotalCell = document.createElement('td');
+            grandTotalCell.textContent = formatCurrency(grandTotal);
+            grandTotalCell.style.fontWeight = 'bold';
+            totalRow.appendChild(grandTotalCell);
+            
+            tableBody.appendChild(totalRow);
+            
+            setTimeout(adjustTables, 10);
+        }
+
+        // Função para popular a tabela de fontes
+        function populateSourceTable() {
+            const tableBody = document.querySelector('#sourceTable tbody');
+            tableBody.innerHTML = '';
+            
+            const tableHead = document.querySelector('#sourceTable thead tr');
+            tableHead.innerHTML = '<th>Fonte</th>';
+            
+            // Atualiza filtros
+            updateFilterTitle();
+            
+            if (!appData.sourceSummary || Object.keys(appData.sourceSummary).length === 0) {
+                return;
+            }
+            
+            const selectedMonth = monthSelect.value;
+            const months = selectedMonth === 'Todos' ? appData.months : [selectedMonth];
+            const tipos = appData.tipos;
+            
+            // Adiciona cabeçalhos de tipos
+            tipos.forEach(tipo => {
+                const th = document.createElement('th');
+                th.textContent = tipo;
+                tableHead.appendChild(th);
+            });
+            
+            // Adiciona coluna de total
+            const totalTh = document.createElement('th');
+            totalTh.textContent = 'Total';
+            tableHead.appendChild(totalTh);
+            
+            // Prepara os dados agregados por fonte
+            const sourceData = {};
+            appData.sources.forEach(source => {
+                sourceData[source] = {
+                    tipos: {},
+                    total: 0
+                };
+                
+                tipos.forEach(tipo => {
+                    sourceData[source].tipos[tipo] = 0;
+                });
+            });
+            
+            // Agrega os dados para os meses selecionados
+            months.forEach(month => {
+                if (appData.sourceSummary[month]) {
+                    for (const source in appData.sourceSummary[month]) {
+                        for (const tipo in appData.sourceSummary[month][source]) {
+                            const value = parseFloat(appData.sourceSummary[month][source][tipo] || 0);
+                            if (sourceData[source]) {
+                                sourceData[source].tipos[tipo] += value;
+                                sourceData[source].total += value;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Cria as linhas da tabela
+            for (const source in sourceData) {
+                const row = document.createElement('tr');
+                
+                // Coluna de fonte
+                const sourceCell = document.createElement('td');
+                sourceCell.textContent = source;
+                row.appendChild(sourceCell);
+                
+                // Colunas de tipo
+                tipos.forEach(tipo => {
+                    const value = sourceData[source].tipos[tipo] || 0;
+                    const cell = document.createElement('td');
+                    cell.textContent = formatCurrency(value);
+                    row.appendChild(cell);
+                });
+                
+                // Coluna total
+                const totalCell = document.createElement('td');
+                totalCell.textContent = formatCurrency(sourceData[source].total);
+                totalCell.style.fontWeight = 'bold';
+                row.appendChild(totalCell);
+                
+                tableBody.appendChild(row);
+            }
+            
+            // Linha de total
+            const totalRow = document.createElement('tr');
+            totalRow.classList.add('table-active');
+            
+            const totalLabelCell = document.createElement('td');
+            totalLabelCell.textContent = 'TOTAL';
+            totalLabelCell.style.fontWeight = 'bold';
+            totalRow.appendChild(totalLabelCell);
+            
+            // Totais por tipo
+            let grandTotal = 0;
+            tipos.forEach(tipo => {
+                let tipoTotal = 0;
+                for (const source in sourceData) {
+                    tipoTotal += parseFloat(sourceData[source].tipos[tipo] || 0);
+                }
+                
+                grandTotal += tipoTotal;
+                
+                const cell = document.createElement('td');
+                cell.textContent = formatCurrency(tipoTotal);
+                cell.style.fontWeight = 'bold';
+                totalRow.appendChild(cell);
+            });
+            
+            // Total geral
+            const grandTotalCell = document.createElement('td');
+            grandTotalCell.textContent = formatCurrency(grandTotal);
+            grandTotalCell.style.fontWeight = 'bold';
+            totalRow.appendChild(grandTotalCell);
+            
+            tableBody.appendChild(totalRow);
+        }
+
+        // Função para popular tabelas de rubricas
+        function populateRubricasTables() {
+            const container = document.getElementById('rubricasContainer');
+            container.innerHTML = '';
+            
+            // Atualiza filtros
+            updateFilterTitle();
+            
+            if (!appData.rubricasSummary || Object.keys(appData.rubricasSummary).length === 0) {
+                return;
+            }
+            
+            const selectedMonth = rubricasMonthSelect.value;
+            const months = selectedMonth === 'Todos' ? appData.months : [selectedMonth];
+            
+            // Para cada mês selecionado
+            months.forEach(month => {
+                if (!appData.rubricasSummary[month]) return;
+                
+                // Cria um título para o mês
+                if (months.length > 1) {
+                    const monthTitle = document.createElement('h5');
+                    monthTitle.textContent = `${monthNames[month] || month}`;
+                    monthTitle.classList.add('mt-3', 'mb-2');
+                    container.appendChild(monthTitle);
+                }
+                
+                // Para cada tipo
+                for (const tipo in appData.rubricasSummary[month]) {
+                    // Cria um acordeão para o tipo
+                    const accordionId = `accordion_${month}_${tipo.replace(/\s+/g, '_')}`;
+                    const accordion = document.createElement('div');
+                    accordion.className = 'accordion mb-3';
+                    accordion.id = accordionId;
+                    
+                    // Cria o item do acordeão
+                    const accordionItem = document.createElement('div');
+                    accordionItem.className = 'accordion-item';
+                    
+                    // Cabeçalho do acordeão
+                    const header = document.createElement('h2');
+                    header.className = 'accordion-header';
+                    header.id = `heading_${accordionId}`;
+                    
+                    const button = document.createElement('button');
+                    button.className = 'accordion-button collapsed';
+                    button.type = 'button';
+                    button.setAttribute('data-bs-toggle', 'collapse');
+                    button.setAttribute('data-bs-target', `#collapse_${accordionId}`);
+                    button.setAttribute('aria-expanded', 'false');
+                    button.setAttribute('aria-controls', `collapse_${accordionId}`);
+                    button.textContent = tipo;
+                    
+                    header.appendChild(button);
+                    accordionItem.appendChild(header);
+                    
+                    // Corpo do acordeão
+                    const collapseDiv = document.createElement('div');
+                    collapseDiv.id = `collapse_${accordionId}`;
+                    collapseDiv.className = 'accordion-collapse collapse';
+                    collapseDiv.setAttribute('aria-labelledby', `heading_${accordionId}`);
+                    collapseDiv.setAttribute('data-bs-parent', `#${accordionId}`);
+                    
+                    const accordionBody = document.createElement('div');
+                    accordionBody.className = 'accordion-body';
+                    
+                    // Tabela de rubricas
+                    const tableContainer = document.createElement('div');
+                    tableContainer.className = 'table-container';
+                    
+                    const table = document.createElement('table');
+                    table.className = 'table table-sm table-striped';
+                    
+                    // Cabeçalho da tabela
+                    const thead = document.createElement('thead');
+                    const headerRow = document.createElement('tr');
+                    
+                    const rubricaHeader = document.createElement('th');
+                    rubricaHeader.textContent = 'Rubrica';
+                    headerRow.appendChild(rubricaHeader);
+                    
+                    // Adiciona cabeçalhos de fontes
+                    appData.sources.forEach(source => {
+                        const sourceHeader = document.createElement('th');
+                        sourceHeader.textContent = source;
+                        headerRow.appendChild(sourceHeader);
+                    });
+                    
+                    // Adiciona cabeçalho de total
+                    const totalHeader = document.createElement('th');
+                    totalHeader.textContent = 'Total';
+                    headerRow.appendChild(totalHeader);
+                    
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+                    
+                    // Corpo da tabela
+                    const tbody = document.createElement('tbody');
+                    
+                    // Adiciona as rubricas
+                    const rubricas = appData.rubricasSummary[month][tipo];
+                    let tipoTotal = 0;
+                    const fonteTotals = {};
+                    
+                    appData.sources.forEach(source => {
+                        fonteTotals[source] = 0;
+                    });
+                    
+                    rubricas.forEach(rubrica => {
+                        const row = document.createElement('tr');
+                        
+                        // Coluna de rubrica
+                        const rubricaCell = document.createElement('td');
+                        rubricaCell.textContent = rubrica.rubrica;
+                        row.appendChild(rubricaCell);
+                        
+                        // Colunas de fontes
+                        let rubricaTotal = 0;
+                        
+                        appData.sources.forEach(source => {
+                            const value = parseFloat(rubrica.fontes[source] || 0);
+                            rubricaTotal += value;
+                            fonteTotals[source] += value;
+                            
+                            const sourceCell = document.createElement('td');
+                            sourceCell.textContent = formatCurrency(value);
+                            row.appendChild(sourceCell);
+                        });
+                        
+                        // Coluna total da rubrica
+                        const rubricaTotalCell = document.createElement('td');
+                        rubricaTotalCell.textContent = formatCurrency(rubricaTotal);
+                        rubricaTotalCell.style.fontWeight = 'bold';
+                        row.appendChild(rubricaTotalCell);
+                        
+                        tipoTotal += rubricaTotal;
+                        tbody.appendChild(row);
+                    });
+                    
+                    // Linha de total
+                    const totalRow = document.createElement('tr');
+                    totalRow.classList.add('table-active');
+                    
+                    const totalLabelCell = document.createElement('td');
+                    totalLabelCell.textContent = 'TOTAL';
+                    totalLabelCell.style.fontWeight = 'bold';
+                    totalRow.appendChild(totalLabelCell);
+                    
+                    // Totais por fonte
+                    appData.sources.forEach(source => {
+                        const cell = document.createElement('td');
+                        cell.textContent = formatCurrency(fonteTotals[source]);
+                        cell.style.fontWeight = 'bold';
+                        totalRow.appendChild(cell);
+                    });
+                    
+                    // Total geral
+                    const tipoTotalCell = document.createElement('td');
+                    tipoTotalCell.textContent = formatCurrency(tipoTotal);
+                    tipoTotalCell.style.fontWeight = 'bold';
+                    totalRow.appendChild(tipoTotalCell);
+                    
+                    tbody.appendChild(totalRow);
+                    table.appendChild(tbody);
+                    
+                    tableContainer.appendChild(table);
+                    accordionBody.appendChild(tableContainer);
+                    collapseDiv.appendChild(accordionBody);
+                    accordionItem.appendChild(collapseDiv);
+                    accordion.appendChild(accordionItem);
+                    container.appendChild(accordion);
+                }
+            });
+        }
+
+        // Evento de upload
+        uploadBtn.addEventListener('click', function() {
+            const file = fileInput.files[0];
+            if (!file) {
+                errorMsg.textContent = 'Selecione um arquivo para upload.';
+                errorMsg.style.display = 'block';
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // Pegar empresas selecionadas (exceto "Todos")
+            const checkTodos = document.getElementById('checkTodos');
+            if (!checkTodos.checked && selectedEmpresas.length > 0) {
+                formData.append('emp_filter', JSON.stringify(selectedEmpresas));
+            }
+            
+            errorMsg.style.display = 'none';
+            loadingMsg.style.display = 'block';
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Erro na resposta do servidor');
+                return response.json();
+            })
+            .then(data => {
+                loadingMsg.style.display = 'none';
+                
+                if (data.error) {
+                    errorMsg.textContent = data.error;
+                    errorMsg.style.display = 'block';
+                    return;
+                }
+                
+                appData = data;
+                populateEmpFilter(data.empCodigos);
+                
+                // Popula selects de mês
+                monthSelect.innerHTML = '<option value="Todos">Todos os meses</option>';
+                rubricasMonthSelect.innerHTML = '<option value="Todos">Todos os meses</option>';
+                data.months.forEach(month => {
+                    const option = document.createElement('option');
+                    option.value = month;
+                    option.textContent = monthNames[month] || month;
+                    monthSelect.appendChild(option.cloneNode(true));
+                    rubricasMonthSelect.appendChild(option);
+                });
+                
+                // Popula as tabelas
+                populateMonthTable();
+                populateSourceTable();
+                populateRubricasTables();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                loadingMsg.style.display = 'none';
+                errorMsg.textContent = 'Erro ao enviar arquivo: ' + error.message;
+                errorMsg.style.display = 'block';
+            });
+        });
+
+        // Event listeners para os selects de mês
+        monthSelect.addEventListener('change', populateSourceTable);
+        rubricasMonthSelect.addEventListener('change', populateRubricasTables);
+
+        // Toggle de tema
+        themeToggle.addEventListener('click', () => {
+            const newTheme = htmlElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+            htmlElement.setAttribute('data-bs-theme', newTheme);
+            const icon = themeToggle.querySelector('i');
+            icon.classList.toggle('bi-moon-fill');
+            icon.classList.toggle('bi-sun-fill');
+        });
+
+        // Inicializa com tema dark se preferido
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            htmlElement.setAttribute('data-bs-theme', 'dark');
+            const icon = themeToggle.querySelector('i');
+            icon.classList.replace('bi-moon-fill', 'bi-sun-fill');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+1.Rodar o arquivo Python app.py
+
+2.Abrir a pagina localhost:5000 na web
+
+3.Carregar a tabela (xlsx ou csv) exportada e formatada
